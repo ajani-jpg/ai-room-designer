@@ -17,7 +17,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Home page (simple upload form)
+// Home page
 app.get("/", (req, res) => {
   res.send(`
     <h2>Upload a room image</h2>
@@ -35,11 +35,11 @@ app.post("/upload", upload.single("image"), async (req, res) => {
       return res.status(400).send("No image uploaded");
     }
 
-    const imagePath = req.file.path;
+    const imageBuffer = fs.readFileSync(req.file.path);
 
     const response = await openai.images.edit({
       model: "dall-e-2",
-      image: fs.createReadStream(imagePath),
+      image: imageBuffer, // ✅ FIXED HERE
       prompt: "Make this room look modern and aesthetic",
       size: "1024x1024",
     });
@@ -53,9 +53,9 @@ app.post("/upload", upload.single("image"), async (req, res) => {
       <a href="/">Try another</a>
     `);
 
-    fs.unlinkSync(imagePath);
+    fs.unlinkSync(req.file.path);
   } catch (error) {
-    console.error(error);
+    console.error("FULL ERROR:", error);
     res.status(500).send("Error generating image");
   }
 });
