@@ -17,12 +17,18 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Test route
+// Home page (simple upload form)
 app.get("/", (req, res) => {
-  res.send("Server is running 🚀");
+  res.send(`
+    <h2>Upload a room image</h2>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+      <input type="file" name="image" />
+      <button type="submit">Upload</button>
+    </form>
+  `);
 });
 
-// Upload + edit image
+// Upload route
 app.post("/upload", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
@@ -38,11 +44,16 @@ app.post("/upload", upload.single("image"), async (req, res) => {
       size: "1024x1024",
     });
 
-    res.json({
-      image: response.data[0].url,
-    });
+    const imageUrl = response.data[0].url;
 
-    fs.unlinkSync(imagePath); // clean up file
+    res.send(`
+      <h2>Result:</h2>
+      <img src="${imageUrl}" style="max-width:500px;" />
+      <br/><br/>
+      <a href="/">Try another</a>
+    `);
+
+    fs.unlinkSync(imagePath);
   } catch (error) {
     console.error(error);
     res.status(500).send("Error generating image");
