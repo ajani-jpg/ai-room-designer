@@ -2,14 +2,14 @@ import express from "express";
 import multer from "multer";
 import cors from "cors";
 import dotenv from "dotenv";
-import fs from "fs";
 import OpenAI from "openai";
+import fs from "fs";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 const upload = multer({ dest: "uploads/" });
 
@@ -17,43 +17,39 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Home page (upload form)
+// Test route
 app.get("/", (req, res) => {
-  res.send(`
-    <h1>AI Room Designer</h1>
-    <form action="/upload" method="post" enctype="multipart/form-data">
-      <input type="file" name="image" required />
-      <button type="submit">Upload & Redesign</button>
-    </form>
-  `);
+  res.send("Server is running 🚀");
 });
 
-// Handle image upload
+// Upload + edit image
 app.post("/upload", upload.single("image"), async (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).send("No image uploaded");
+    }
+
     const imagePath = req.file.path;
 
-    const result = await openai.images.edit({
-      model: "gpt-image-1",
-      prompt: "Redesign this room to look modern, aesthetic, and well-lit",
+    const response = await openai.images.edit({
+      model: "dall-e-2",
       image: fs.createReadStream(imagePath),
+      prompt: "Make this room look modern and aesthetic",
+      size: "1024x1024",
     });
 
-    const image_base64 = result.data[0].b64_json;
+    res.json({
+      image: response.data[0].url,
+    });
 
-    res.send(`
-      <h2>Redesigned Room</h2>
-      <img src="data:image/png;base64,${image_base64}" />
-      <br><br>
-      <a href="/">Try another</a>
-    `);
+    fs.unlinkSync(imagePath); // clean up file
   } catch (error) {
     console.error(error);
-    res.send("Error generating image: " + error.message);
+    res.status(500).send("Error generating image");
   }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+  console.log(`Server running on port ${PORT}`);
 });
