@@ -1,72 +1,59 @@
 import express from "express";
 import multer from "multer";
+import cors from "cors";
+import dotenv from "dotenv";
 import fs from "fs";
-import path from "path";
 import OpenAI from "openai";
 
+dotenv.config();
+
 const app = express();
+app.use(cors());
+app.use(express.urlencoded({ extended: true }));
+
 const upload = multer({ dest: "uploads/" });
 
-const client = new OpenAI({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Serve homepage
+// Home page (upload form)
 app.get("/", (req, res) => {
   res.send(`
     <h1>AI Room Designer</h1>
     <form action="/upload" method="post" enctype="multipart/form-data">
       <input type="file" name="image" required />
-      <select name="style">
-        <option value="modern">Modern</option>
-        <option value="luxury">Luxury</option>
-        <option value="minimalist">Minimalist</option>
-      </select>
-      <button type="submit">Generate Design</button>
+      <button type="submit">Upload & Redesign</button>
     </form>
   `);
 });
 
-// Handle upload
+// Handle image upload
 app.post("/upload", upload.single("image"), async (req, res) => {
   try {
-    const style = req.body.style || "modern";
     const imagePath = req.file.path;
 
-    // Read image as base64
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64Image = imageBuffer.toString("base64");
-
-    const prompt = `Redesign this room in ${style} interior design style`;
-
-    const result = await client.images.generate({
+    const result = await openai.images.edit({
       model: "gpt-image-1",
-      prompt: prompt,
-      size: "1024x1024",
-      image: base64Image,
+      prompt: "Redesign this room to look modern, aesthetic, and well-lit",
+      image: fs.createReadStream(imagePath),
     });
 
-    const imageBase64 = result.data[0].b64_json;
-    const outputPath = path.join("uploads", "output.png");
-
-    fs.writeFileSync(outputPath, Buffer.from(imageBase64, "base64"));
+    const image_base64 = result.data[0].b64_json;
 
     res.send(`
-      <h2>Generated Design</h2>
-      <img src="data:image/png;base64,${imageBase64}" width="500"/>
-      <br/><br/>
-      <a href="/">Go Back</a>
+      <h2>Redesigned Room</h2>
+      <img src="data:image/png;base64,${image_base64}" />
+      <br><br>
+      <a href="/">Try another</a>
     `);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error generating image: " + err.message);
+  } catch (error) {
+    console.error(error);
+    res.send("Error generating image: " + error.message);
   }
 });
 
-// ✅ IMPORTANT: Render-compatible port
-const PORT = process.env.PORT || 3000;
-
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log("Server running on port " + PORT);
 });
